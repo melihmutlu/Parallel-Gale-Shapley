@@ -2,16 +2,19 @@
 #include <iostream>
 #include <vector>
 #include <algorithm> 
+#include <fstream>
 
+using namespace std;
 
 int main (int argc, char** argv){
 int rank, size;
-
-MPI_Init (&argc, &argv); /* starts MPI */
-
 int master = 0;	 // rank of master processor
 int terminate = -2;
+int rejection = -4;
+vector<int>::iterator _old;
+vector<int>::iterator _new;
 
+MPI_Init (&argc, &argv); /* starts MPI */
 MPI_Comm_rank (MPI_COMM_WORLD, &rank); /* get current process id */
 MPI_Comm_size (MPI_COMM_WORLD, &size); /* get number of processes */
 int number = 0;
@@ -49,6 +52,18 @@ if(rank == master){
 				MPI_Send(&terminate, 1, MPI_INT, i , 0, MPI_COMM_WORLD);
 			}
 
+			// Open an output file
+			ofstream outFile;
+			outFile.open("output.txt");
+			// Recieve all couples from women and write them into the file
+			for(int i= (size+1)/2 ; i<size ; i++ ){
+				MPI_Recv(&number, 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+				outFile << number << "-" << i-n << endl;
+			}
+			outFile.close();	// File is closed
+
+			MPI_Finalize(); // Finalize the master 
+			break;
 
 		}
 	}
@@ -127,7 +142,10 @@ if(rank == master){
 		}
 		flag = 0;
 	}
-
-
+	// Send its rank and rank of the her fiance
+	MPI_Send( &isEngaged , 1, MPI_INT, master , 0, MPI_COMM_WORLD);
+	MPI_Finalize(); // Finalize the woman
+}
+	
 return 0;
 }
