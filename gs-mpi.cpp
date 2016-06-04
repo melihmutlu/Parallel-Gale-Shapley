@@ -1,5 +1,8 @@
 #include <mpi.h>
 #include <iostream>
+#include <vector>
+#include <algorithm> 
+
 
 int main (int argc, char** argv){
 int rank, size;
@@ -47,8 +50,7 @@ if(rank == master){
 			}
 
 
-		MPI_Finalize(); // Finalize the master 
-		break;
+		}
 	}
 }else if(rank <= (size-1)/2){ // Men
 	vector<int> prefs;	// Preference list of men
@@ -64,9 +66,26 @@ if(rank == master){
 
 	// Send first proposes to women that are first in the list
 	MPI_Send(&rank, 1, MPI_INT, prefs[woman2prop], 0, MPI_COMM_WORLD);
-	cout << rank << " proposed to " << prefs[woman2prop] << endl;
 	woman2prop++; // Increase the pointer
 
+	//Listen the answer from a woman or signal from the master
+	while(!flag){
+		MPI_Iprobe( MPI_ANY_SOURCE , 0 , MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE);
+		if(flag){
+			MPI_Recv(&number, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			if(number == terminate){ // If Recived data from master
+				// Break the while
+				break;
+			}else{	// If recieved data from a woman
+				// This means this man is rejected. Propose the next woman
+				MPI_Send( &rank , 1, MPI_INT, prefs[woman2prop], 0, MPI_COMM_WORLD);
+				woman2prop++;
+			}
+		}
+		flag = 0;
+	}
+
+	MPI_Finalize();	// Finalize the man
 }else{	// Women
 	vector<int> prefs;	// Preference list of men
 	int flag = 0;
@@ -91,7 +110,6 @@ if(rank == master){
 			}else{	// Recieved data from a man
 				if(!isEngaged){	// The woman is not engaged yet
 					isEngaged = number;	// Store the rank of the man
-					cout << rank << " is engaged with " << number << endl;
 					MPI_Send(&terminate, 1, MPI_INT, 0 , 0, MPI_COMM_WORLD);
 				}else{	// Recieved a proposal but already engaged
 					
@@ -102,9 +120,7 @@ if(rank == master){
 						MPI_Send(&rejection, 1, MPI_INT, number , 0, MPI_COMM_WORLD);	// Reject the new man
 					else{ // Otherwise
 						MPI_Send(&rejection, 1, MPI_INT, isEngaged, 0, MPI_COMM_WORLD);	// Reject the old man
-						cout << rank << " broke up with " << isEngaged << endl;
 						isEngaged = number;	// Engaged with new man
-						cout << rank << " engaged with " << isEngaged << endl;
 					}	
 				}
 			}
